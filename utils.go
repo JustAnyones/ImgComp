@@ -147,6 +147,7 @@ func wrapStringIntelligently(s string, maxLength int) string {
 
 // loadImage attempts to load an image from the given path.
 // It includes special handling for .jxl files, converting them to PNG using 'djxl' utility.
+// TODO: handle webps and animated versions of those formats
 func loadImage(path string) (image.Image, error) {
 	ext := filepath.Ext(path)
 	if ext == ".jxl" {
