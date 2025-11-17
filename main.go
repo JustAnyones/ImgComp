@@ -10,64 +10,24 @@ import (
 	"time"
 
 	"imgcomp/ui"
+	"imgcomp/util"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 )
 
-var resultLabel *widget.Label
+var pixelWiseTab *ui.PixelWiseTab
+var layerSliderTab *ui.LayerSliderTab
 
-const (
-	ImageMaxWidth  = 400 // Maximum width for the images
-	ImageMaxHeight = 400 // Maximum height for the images
-)
-
-func constructComparison(image1 *image.Image, image2 *image.Image) (*canvas.Image, *canvas.Image) {
-	sizeX, sizeY := getScaledBounds(image1)
-	newSize := fyne.NewSize(sizeX, sizeY)
-
-	resized1 := rescaleImageFast(*image1)
-	resized2 := rescaleImageFast(*image2)
-
-	comp1 := canvas.NewImageFromImage(resized1)
-	comp1.FillMode = canvas.ImageFillOriginal
-	comp1.ScaleMode = canvas.ImageScaleFastest
-	comp1.SetMinSize(newSize)
-	comp1.Resize(newSize)
-	comp1.Move(fyne.NewPos(0, 0))
-
-	cropped := cropImageFast(&resized2, 0.5)
-	comp2 := canvas.NewImageFromImage(cropped)
-	comp2.FillMode = canvas.ImageFillOriginal
-	comp1.ScaleMode = canvas.ImageScaleFastest
-	comp2.SetMinSize(newSize)
-	comp2.Resize(newSize)
-	comp2.Move(fyne.NewPos(0, 0))
-	return comp1, comp2
-}
-
-var sliderSection *fyne.Container
-
-var sliderImageContainer *fyne.Container = container.NewWithoutLayout()
+var comparisonPanel *ui.ImageComparisonPanel
 
 var image1Path string
 var image2Path string
 
-var imageLabel1 *widget.Label = widget.NewLabel("Image 1")
-var imageLabel2 *widget.Label = widget.NewLabel("Image 2")
-
 var image1 *image.Image
 var image2 *image.Image
-
-var image1Canvas *ui.ClickableImage // Canvas to display the first image
-var image2Canvas *ui.ClickableImage // Canvas to display the second image
-var diffCanvas *canvas.Image        // Canvas to display the difference image
 
 // Reference to the main window, used for displaying dialogs and other UI elements.
 var mainWindow fyne.Window
@@ -77,32 +37,29 @@ var loadingWaitGroup = &sync.WaitGroup{}
 
 func renderComparison() {
 	startTime := time.Now()
-	diff, mae, pixelCount := computeImageDiffFast(image1, image2)
+	diff, mae, pixelCount := util.ComputeImageDiffFast(image1, image2)
 	fmt.Printf("Image difference computed in %v\n", time.Since(startTime))
-	diffCanvas.Image = diff
-	diffCanvas.Refresh()
+
+	pixelWiseTab.SetImage(&diff)
 
 	// Update the comparison section with the new images
-	sliderImageContainer.RemoveAll()
+	layerSliderTab.RemoveAll()
 	if mae > 0 {
-		c1, c2 := constructComparison(image1, image2)
-		sliderImageContainer.Add(c1)
-		sliderImageContainer.Add(c2)
+		layerSliderTab.Compare(image1, image2)
 	}
 
-	sliderImageContainer.Refresh()
-	sliderSection.Refresh()
+	layerSliderTab.Refresh()
 
 	if mae == 0 {
-		resultLabel.SetText("Images are identical")
+		pixelWiseTab.SetMessage("Images are identical")
 	} else {
-		resultLabel.SetText(fmt.Sprintf("Images differ with MAE: %.2f (%d px)", mae, pixelCount))
+		pixelWiseTab.SetMessage(fmt.Sprintf("Images differ with MAE: %.2f (%d px)", mae, pixelCount))
 	}
 }
 
 func loadAndRenderImage(path string, index int, wg bool) {
 	// Load the image from the specified path
-	img, err := loadImage(path)
+	img, err := util.LoadImage(path)
 	if err != nil {
 		fmt.Println("Error loading image:", err)
 		if wg {
@@ -124,20 +81,18 @@ func loadAndRenderImage(path string, index int, wg bool) {
 
 	// Determine which image to update based on the index
 	const maxLength = 64
-	rescaledImg := rescaleImageFast(img)
+	rescaledImg := util.RescaleImageFast(img)
 	if index == 0 {
 		image1Path = path
 		image1 = &rescaledImg
 		fyne.Do(func() {
-			imageLabel1.SetText(fmt.Sprintf("%s (%s bytes)", wrapStringIntelligently(path, maxLength), formatIntWithSpaces(fileInfo.Size())))
-			(*image1Canvas).SetImage(img)
+			comparisonPanel.SetImage(1, &img, fmt.Sprintf("%s (%s bytes)", util.WrapStringIntelligently(path, maxLength), util.FormatIntWithSpaces(fileInfo.Size())))
 		})
 	} else {
 		image2Path = path
 		image2 = &rescaledImg
 		fyne.Do(func() {
-			imageLabel2.SetText(fmt.Sprintf("%s (%s bytes)", wrapStringIntelligently(path, maxLength), formatIntWithSpaces(fileInfo.Size())))
-			(*image2Canvas).SetImage(img)
+			comparisonPanel.SetImage(2, &img, fmt.Sprintf("%s (%s bytes)", util.WrapStringIntelligently(path, maxLength), util.FormatIntWithSpaces(fileInfo.Size())))
 		})
 
 	}
@@ -157,52 +112,77 @@ func main() {
 	// Define flags for command-line arguments
 	image1Flag := flag.String("image1", "", "Path to the first image")
 	image2Flag := flag.String("image2", "", "Path to the second image")
+	showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
 	flag.Parse()
+
+	fmt.Println("HI", showManagementButtonsFlag)
 
 	app := app.New()
 	mainWindow = app.NewWindow("Image comparison tool")
 
-	// Canvas elements to display images
-	image1Canvas = ui.NewClickableImage(nil, func() {
-		if image1Path == "" {
-			return
-		}
-		err := exec.Command("xdg-open", image1Path).Start()
-		if err != nil {
-			dialog.ShowError(err, mainWindow)
-			return
-		}
-	})
-	image1Canvas.SetImageMinSize(fyne.NewSize(ImageMaxWidth, ImageMaxHeight))
-	image2Canvas = ui.NewClickableImage(nil, func() {
-		if image2Path == "" {
-			return
-		}
-		err := exec.Command("xdg-open", image2Path).Start()
-		if err != nil {
-			dialog.ShowError(err, mainWindow)
-			return
-		}
-	})
-	image2Canvas.SetImageMinSize(fyne.NewSize(ImageMaxWidth, ImageMaxHeight))
+	comparisonPanel = ui.NewImageComparisonPanel(
+		// onImageClicked
+		func(imageNumber int) {
+			path := image1Path
+			if imageNumber == 2 {
+				path = image2Path
+			}
 
-	// Create element to display calculated differences.
-	diffCanvas = canvas.NewImageFromImage(nil)
-	diffCanvas.SetMinSize(fyne.NewSize(ImageMaxWidth, ImageMaxHeight))
-	diffCanvas.FillMode = canvas.ImageFillContain
+			err := exec.Command("xdg-open", path).Start()
+			if err != nil {
+				dialog.ShowError(err, mainWindow)
+				return
+			}
+		},
+		// onImageDeleted
+		func(imageNumber int) {
+			image := image1
+			path := image1Path
+			if imageNumber == 2 {
+				image = image2
+				path = image2Path
+			}
 
-	// Stack the canvas and the clickable button to make the canvas area interactive.
-	img1Container := container.NewStack(
-		container.NewCenter(widget.NewLabel("Drag an image to view it")),
-		image1Canvas,
-	)
-	img2Container := container.NewStack(
-		container.NewCenter(widget.NewLabel("Drag an image to view it")),
-		image2Canvas,
+			if image == nil {
+				return
+			}
+
+			if path != "" {
+				err := os.Remove(path)
+				if err != nil {
+					dialog.ShowError(err, mainWindow)
+					return
+				}
+				mainWindow.Close()
+			}
+		},
+		// onImageIgnored
+		func() {
+			if image1 == nil || image2 == nil {
+				dialog.ShowInformation("No images loaded", "Please load both images before ignoring.", mainWindow)
+				return
+			}
+			// Append a line to a file
+			file, err := os.OpenFile("ignored_images.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				dialog.ShowError(err, mainWindow)
+				return
+			}
+			defer file.Close()
+			_, err = file.WriteString(fmt.Sprintf("%s:%s\n", image1Path, image2Path))
+			if err != nil {
+				dialog.ShowError(err, mainWindow)
+				return
+			}
+			mainWindow.Close()
+		},
 	)
 
 	// Set up drag and drop functionality for the window.
 	mainWindow.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
+
+		img1Container := comparisonPanel.Image1Container()
+		img2Container := comparisonPanel.Image2Container()
 
 		img1AbsPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(img1Container)
 		img2AbsPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(img2Container)
@@ -228,125 +208,19 @@ func main() {
 		}
 	})
 
-	resultLabel = widget.NewLabel("Computed result")
+	// Create tabs for Difference and Slider sections
+	pixelWiseTab = ui.NewPixelWiseTab()
+	layerSliderTab = ui.NewLayerSliderTab()
 
-	ignoreButton := widget.NewButton("Ignore", func() {
-		if image1 == nil || image2 == nil {
-			dialog.ShowInformation("No images loaded", "Please load both images before ignoring.", mainWindow)
-			return
-		}
-		// Append a line to a file
-		file, err := os.OpenFile("ignored_images.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			dialog.ShowError(err, mainWindow)
-			return
-		}
-		defer file.Close()
-		_, err = file.WriteString(fmt.Sprintf("%s:%s\n", image1Path, image2Path))
-		if err != nil {
-			dialog.ShowError(err, mainWindow)
-			return
-		}
-		mainWindow.Close()
-	})
-
-	topImageRow := container.NewGridWithColumns(2,
-		container.NewVBox(
-			container.New(layout.NewCenterLayout(), imageLabel1),
-			img1Container,
-			widget.NewButton("Delete", func() {
-				if image1 == nil {
-					return
-				}
-
-				if image1Path != "" {
-					err := os.Remove(image1Path)
-					if err != nil {
-						dialog.ShowError(err, mainWindow)
-						return
-					}
-					mainWindow.Close()
-				}
-			}),
-		),
-		container.NewVBox(
-			container.New(layout.NewCenterLayout(), imageLabel2),
-			img2Container,
-			widget.NewButton("Delete", func() {
-				if image2 == nil {
-					return
-				}
-
-				if image2Path != "" {
-					err := os.Remove(image2Path)
-					if err != nil {
-						dialog.ShowError(err, mainWindow)
-						return
-					}
-					mainWindow.Close()
-				}
-			}),
-		),
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Difference", pixelWiseTab.GetContainer()),
+		container.NewTabItem("Layer Slider", layerSliderTab.GetContainer()),
 	)
-	topImageRow2 := container.NewVBox(
-		topImageRow,
-		ignoreButton,
-	)
+	tabs.SetTabLocation(container.TabLocationTop)
 
-	// Section for the difference image and result label, using NewMax for the diffCanvas to expand
-	diffSection := container.NewVBox(
-		resultLabel, diffCanvas,
-	)
-
-	_ = ui.NewClickableImage(theme.InfoIcon(), func() {
-		fmt.Println("Custom Clickable Image tapped!")
-		// show a dialog with image
-		dialog.ShowInformation("Image Clicked", "You clicked the custom image!", mainWindow)
-	})
-
-	var debounceTimer *time.Timer
-	var debounceMutex sync.Mutex
-	slider := widget.NewSlider(0, 1)
-	slider.Step = 0.01
-	slider.Value = 0.5 // start in the middle
-	slider.OnChanged = func(val float64) {
-		if len(sliderImageContainer.Objects) < 2 {
-			fmt.Println("Slider image container does not have enough objects to update")
-			return
-		}
-
-		debounceMutex.Lock()
-		if debounceTimer != nil {
-			debounceTimer.Stop()
-		}
-		debounceTimer = time.AfterFunc(10*time.Millisecond, func() {
-			cropped := cropImageFast(image2, val)
-			_, ok := sliderImageContainer.Objects[1].(*canvas.Image)
-			if !ok {
-				fmt.Println("Slider image container does not contain a canvas.Image at index 1")
-				return
-			}
-
-			sliderImageContainer.Objects[1].(*canvas.Image).Image = cropped
-			fyne.Do(func() {
-				canvas.Refresh(sliderImageContainer.Objects[1])
-			})
-
-			//sliderImageContainer.Objects[1].(*canvas.Image).Refresh()
-		})
-		debounceMutex.Unlock()
-	}
-	sliderSection = container.NewVBox(
-		widget.NewLabel("Slider Section"),
-		sliderImageContainer,
-		slider,
-	)
-
-	// Main content, using GridWithRows to divide the window vertically between the top images and the difference section
-	mainContent := container.NewGridWithRows(3,
-		topImageRow2,
-		diffSection,
-		sliderSection,
+	mainContent := container.NewVBox(
+		comparisonPanel.GetContainer(),
+		tabs,
 	)
 
 	// Set the window content using a border layout.
