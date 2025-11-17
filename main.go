@@ -114,7 +114,7 @@ func main() {
 	// Define flags for command-line arguments
 	image1Flag := flag.String("image1", "", "Path to the first image")
 	image2Flag := flag.String("image2", "", "Path to the second image")
-	//showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
+	showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
 	scalingAlgoFlag := flag.String("scaling-algo", "bilinear", "Image scaling algorithm (bilinear, nearest)")
 	flag.Parse()
 
@@ -185,6 +185,7 @@ func main() {
 			mainWindow.Close()
 		},
 		scalingAlgo,
+		*showManagementButtonsFlag,
 	)
 
 	// Set up drag and drop functionality for the window.

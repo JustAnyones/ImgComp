@@ -43,6 +43,7 @@ func NewImageComparisonPanel(
 	onImageDeleted func(imageNumber int),
 	onImageIgnored func(),
 	algo util.ScalingAlgorithm,
+	showManagementButtons bool,
 ) *ImageComparisonPanel {
 	panel := &ImageComparisonPanel{}
 
@@ -69,29 +70,37 @@ func NewImageComparisonPanel(
 		panel.image2Canvas,
 	)
 
+	img1VBox := container.NewVBox(
+		container.New(layout.NewCenterLayout(), panel.image1Label),
+		img1Container,
+	)
+	if showManagementButtons {
+		img1VBox.Add(widget.NewButton("Delete", func() {
+			onImageDeleted(1)
+		}))
+	}
+
+	img2VBox := container.NewVBox(
+		container.New(layout.NewCenterLayout(), panel.image2Label),
+		img2Container,
+	)
+	if showManagementButtons {
+		img2VBox.Add(widget.NewButton("Delete", func() {
+			onImageDeleted(2)
+		}))
+	}
+
 	imageRow := container.NewGridWithColumns(2,
-		container.NewVBox(
-			container.New(layout.NewCenterLayout(), panel.image1Label),
-			img1Container,
-			widget.NewButton("Delete", func() {
-				onImageDeleted(1)
-			}),
-		),
-		container.NewVBox(
-			container.New(layout.NewCenterLayout(), panel.image2Label),
-			img2Container,
-			widget.NewButton("Delete", func() {
-				onImageDeleted(2)
-			}),
-		),
+		img1VBox,
+		img2VBox,
 	)
 
-	ignoreButton := widget.NewButton("Ignore", onImageIgnored)
+	panel.container = container.NewVBox(imageRow)
 
-	panel.container = container.NewVBox(
-		imageRow,
-		ignoreButton,
-	)
+	if showManagementButtons {
+		ignoreButton := widget.NewButton("Ignore", onImageIgnored)
+		panel.container.Add(ignoreButton)
+	}
 
 	return panel
 }
