@@ -1,6 +1,8 @@
-package main
+package ui
 
 import (
+	"image"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
@@ -31,6 +33,12 @@ func NewClickableImage(res fyne.Resource, tapped func()) *ClickableImage {
 // Call this after creating the widget if you want to override its default MinSize.
 func (c *ClickableImage) SetImageMinSize(size fyne.Size) {
 	c.minSize = size
+	c.Refresh()
+}
+
+func (c *ClickableImage) SetImage(res image.Image) {
+	c.image.Image = res
+	c.image.Refresh()
 	c.Refresh()
 }
 

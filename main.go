@@ -1,12 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
+
+	"imgcomp/ui"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -62,9 +65,9 @@ var imageLabel2 *widget.Label = widget.NewLabel("Image 2")
 var image1 *image.Image
 var image2 *image.Image
 
-var image1Canvas *ClickableImage // Canvas to display the first image
-var image2Canvas *ClickableImage // Canvas to display the second image
-var diffCanvas *canvas.Image     // Canvas to display the difference image
+var image1Canvas *ui.ClickableImage // Canvas to display the first image
+var image2Canvas *ui.ClickableImage // Canvas to display the second image
+var diffCanvas *canvas.Image        // Canvas to display the difference image
 
 // Reference to the main window, used for displaying dialogs and other UI elements.
 var mainWindow fyne.Window
@@ -127,16 +130,14 @@ func loadAndRenderImage(path string, index int, wg bool) {
 		image1 = &rescaledImg
 		fyne.Do(func() {
 			imageLabel1.SetText(fmt.Sprintf("%s (%s bytes)", wrapStringIntelligently(path, maxLength), formatIntWithSpaces(fileInfo.Size())))
-			(*image1Canvas).image.Image = img
-			(*image1Canvas).Refresh()
+			(*image1Canvas).SetImage(img)
 		})
 	} else {
 		image2Path = path
 		image2 = &rescaledImg
 		fyne.Do(func() {
 			imageLabel2.SetText(fmt.Sprintf("%s (%s bytes)", wrapStringIntelligently(path, maxLength), formatIntWithSpaces(fileInfo.Size())))
-			(*image2Canvas).image.Image = img
-			(*image2Canvas).Refresh()
+			(*image2Canvas).SetImage(img)
 		})
 
 	}
@@ -153,11 +154,16 @@ func loadAndRenderImage(path string, index int, wg bool) {
 }
 
 func main() {
+	// Define flags for command-line arguments
+	image1Flag := flag.String("image1", "", "Path to the first image")
+	image2Flag := flag.String("image2", "", "Path to the second image")
+	flag.Parse()
+
 	app := app.New()
 	mainWindow = app.NewWindow("Image comparison tool")
 
 	// Canvas elements to display images
-	image1Canvas = NewClickableImage(nil, func() {
+	image1Canvas = ui.NewClickableImage(nil, func() {
 		if image1Path == "" {
 			return
 		}
@@ -168,7 +174,7 @@ func main() {
 		}
 	})
 	image1Canvas.SetImageMinSize(fyne.NewSize(ImageMaxWidth, ImageMaxHeight))
-	image2Canvas = NewClickableImage(nil, func() {
+	image2Canvas = ui.NewClickableImage(nil, func() {
 		if image2Path == "" {
 			return
 		}
@@ -292,7 +298,7 @@ func main() {
 		resultLabel, diffCanvas,
 	)
 
-	_ = NewClickableImage(theme.InfoIcon(), func() {
+	_ = ui.NewClickableImage(theme.InfoIcon(), func() {
 		fmt.Println("Custom Clickable Image tapped!")
 		// show a dialog with image
 		dialog.ShowInformation("Image Clicked", "You clicked the custom image!", mainWindow)
@@ -347,14 +353,10 @@ func main() {
 	mainWindow.SetContent(container.NewVScroll(mainContent))
 	mainWindow.Resize(fyne.NewSize(1000, 500)) // Set initial window size
 
-	// Take full paths as command line arguments
-	if len(os.Args) > 1 {
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run main.go <image1_path> <image2_path>")
-			return
-		}
-		img1Path := os.Args[1]
-		img2Path := os.Args[2]
+	// Load images if provided via flags
+	if *image1Flag != "" && *image2Flag != "" {
+		img1Path := *image1Flag
+		img2Path := *image2Flag
 		if _, err := os.Stat(img1Path); os.IsNotExist(err) {
 			fmt.Printf("Image 1 file does not exist: %s\n", img1Path)
 			return

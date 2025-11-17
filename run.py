@@ -33,7 +33,7 @@ def compare_pair(image1: dict, image2: dict):
         return
 
     # Execute a go program
-    _ = subprocess.run(["go", "run", ".", p1, p2])
+    _ = subprocess.run(["go", "run", ".", "-image1", p1, "-image2", p2])
 
 with open("/home/dominykas/results_similar_images_pretty.json", "r") as f:
     data: list[dict] = json.load(f)
