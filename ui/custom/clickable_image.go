@@ -2,6 +2,7 @@ package custom
 
 import (
 	"image"
+	"imgcomp/util"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -17,14 +18,18 @@ type ClickableImage struct {
 }
 
 // NewClickableImage creates a new ClickableImage widget.
-func NewClickableImage(res fyne.Resource, tapped func()) *ClickableImage {
+func NewClickableImage(res fyne.Resource, tapped func(), algo util.ScalingAlgorithm) *ClickableImage {
 	img := &ClickableImage{
 		image:    canvas.NewImageFromResource(res),
 		onTapped: tapped,
 		minSize:  fyne.NewSize(0, 0),
 	}
-	img.image.FillMode = canvas.ImageFillOriginal  // Default fill mode
-	img.image.ScaleMode = canvas.ImageScaleFastest // Use fastest scaling for performance
+	img.image.FillMode = canvas.ImageFillOriginal // Default fill mode
+	if algo == util.NearestNeighbor {
+		img.image.ScaleMode = canvas.ImageScalePixels
+	} else {
+		img.image.ScaleMode = canvas.ImageScaleFastest // Use fastest scaling for performance
+	}
 	img.ExtendBaseWidget(img)
 	return img
 }

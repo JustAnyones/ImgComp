@@ -15,6 +15,16 @@ import (
 	"github.com/nfnt/resize"
 )
 
+// ScalingAlgorithm defines the type for image scaling algorithms.
+type ScalingAlgorithm int
+
+const (
+	// Bilinear uses bilinear interpolation.
+	Bilinear ScalingAlgorithm = iota
+	// NearestNeighbor uses nearest-neighbor interpolation.
+	NearestNeighbor
+)
+
 const (
 	ImageMaxWidth  = 400 // Maximum width for the images
 	ImageMaxHeight = 400 // Maximum height for the images
@@ -23,7 +33,7 @@ const (
 // cropImageFast crops the src image horizontally based on ratio (0 to 1).
 // ratio=0 shows right half only, ratio=1 shows left half only.
 // The cropped area moves accordingly.
-func CropImageFast(src *image.Image, ratio float64) image.Image {
+func CropImageFast(src *image.Image, ratio float64, algo ScalingAlgorithm) image.Image {
 	bounds := (*src).Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
 
@@ -38,13 +48,20 @@ func CropImageFast(src *image.Image, ratio float64) image.Image {
 
 	croppedImage := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.Draw(croppedImage, destRect, *src, image.Point{}, draw.Src)
-	return RescaleImageFast(croppedImage)
+	return RescaleImageFast(croppedImage, algo)
 }
 
 // rescaleImageFast rescales the src image to fit within ImageMaxWidth and ImageMaxHeight using Bilinear interpolation.
-func RescaleImageFast(src image.Image) image.Image {
+func RescaleImageFast(src image.Image, algo ScalingAlgorithm) image.Image {
 	w, h := GetScaledBounds(&src)
-	return resize.Resize(uint(w), uint(h), src, resize.Bilinear)
+	var interp resize.InterpolationFunction
+	switch algo {
+	case NearestNeighbor:
+		interp = resize.NearestNeighbor
+	default:
+		interp = resize.Bilinear
+	}
+	return resize.Resize(uint(w), uint(h), src, interp)
 }
 
 // absDiff calculates the absolute difference between two uint32 values.
@@ -57,12 +74,19 @@ func absDiff(a, b uint32) uint32 {
 
 // computeImageDiff computes the pixel-wise difference between two images.
 // It returns a new image showing the differences and the mean absolute error (MAE).
-func ComputeImageDiffFast(img1, img2 *image.Image) (image.Image, float64, uint64) {
+func ComputeImageDiffFast(img1, img2 *image.Image, algo ScalingAlgorithm) (image.Image, float64, uint64) {
 	bounds := (*img1).Bounds()
 	// Computing difference requires both images to have the same bounds.
 	img22 := *img2
 	if !(*img2).Bounds().Eq(bounds) {
-		img22 = imaging.Resize(*img2, bounds.Dx(), bounds.Dy(), imaging.Linear)
+		var filter imaging.ResampleFilter
+		switch algo {
+		case NearestNeighbor:
+			filter = imaging.NearestNeighbor
+		default:
+			filter = imaging.Linear
+		}
+		img22 = imaging.Resize(*img2, bounds.Dx(), bounds.Dy(), filter)
 	}
 
 	var amplificationFactor float64 = 5.0

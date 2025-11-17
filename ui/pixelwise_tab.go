@@ -16,11 +16,16 @@ type PixelWiseTab struct {
 	container   *fyne.Container
 }
 
-func NewPixelWiseTab() *PixelWiseTab {
+func NewPixelWiseTab(algo util.ScalingAlgorithm) *PixelWiseTab {
 	p := &PixelWiseTab{}
 	p.resultLabel = widget.NewLabel("???")
 
 	p.diffCanvas = canvas.NewImageFromImage(nil)
+	if algo == util.NearestNeighbor {
+		p.diffCanvas.ScaleMode = canvas.ImageScalePixels
+	} else {
+		p.diffCanvas.ScaleMode = canvas.ImageScaleFastest
+	}
 	p.diffCanvas.SetMinSize(fyne.NewSize(util.ImageMaxWidth, util.ImageMaxHeight))
 	p.diffCanvas.FillMode = canvas.ImageFillContain
 

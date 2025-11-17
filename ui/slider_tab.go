@@ -18,6 +18,7 @@ type LayerSliderTab struct {
 	container      *fyne.Container
 	img1           *image.Image
 	img2           *image.Image
+	scalingAlgo    util.ScalingAlgorithm
 }
 
 func (s *LayerSliderTab) RemoveAll() *fyne.Container {
@@ -30,28 +31,37 @@ func (s *LayerSliderTab) Refresh() {
 	s.container.Refresh()
 }
 
-func (s *LayerSliderTab) Compare(img1, img2 *image.Image) {
+func (s *LayerSliderTab) Compare(img1, img2 *image.Image, algo util.ScalingAlgorithm) {
 
 	s.img1 = img1
 	s.img2 = img2
+	s.scalingAlgo = algo
 
 	sizeX, sizeY := util.GetScaledBounds(img1)
 	newSize := fyne.NewSize(sizeX, sizeY)
 
-	resized1 := util.RescaleImageFast(*img1)
-	resized2 := util.RescaleImageFast(*img2)
+	resized1 := util.RescaleImageFast(*img1, algo)
+	resized2 := util.RescaleImageFast(*img2, algo)
 
 	comp1 := canvas.NewImageFromImage(resized1)
 	comp1.FillMode = canvas.ImageFillOriginal
-	comp1.ScaleMode = canvas.ImageScaleFastest
+	if algo == util.NearestNeighbor {
+		comp1.ScaleMode = canvas.ImageScalePixels
+	} else {
+		comp1.ScaleMode = canvas.ImageScaleFastest
+	}
 	comp1.SetMinSize(newSize)
 	comp1.Resize(newSize)
 	comp1.Move(fyne.NewPos(0, 0))
 
-	cropped := util.CropImageFast(&resized2, 0.5)
+	cropped := util.CropImageFast(&resized2, 0.5, algo)
 	comp2 := canvas.NewImageFromImage(cropped)
 	comp2.FillMode = canvas.ImageFillOriginal
-	comp1.ScaleMode = canvas.ImageScaleFastest
+	if algo == util.NearestNeighbor {
+		comp2.ScaleMode = canvas.ImageScalePixels
+	} else {
+		comp2.ScaleMode = canvas.ImageScaleFastest
+	}
 	comp2.SetMinSize(newSize)
 	comp2.Resize(newSize)
 	comp2.Move(fyne.NewPos(0, 0))
@@ -61,9 +71,10 @@ func (s *LayerSliderTab) Compare(img1, img2 *image.Image) {
 	s.Refresh()
 }
 
-func NewLayerSliderTab() *LayerSliderTab {
+func NewLayerSliderTab(algo util.ScalingAlgorithm) *LayerSliderTab {
 	sliderSection := &LayerSliderTab{
 		imageContainer: container.NewWithoutLayout(),
+		scalingAlgo:    algo,
 	}
 
 	var debounceTimer *time.Timer
@@ -88,7 +99,7 @@ func NewLayerSliderTab() *LayerSliderTab {
 				fmt.Println("Slider image container does not contain a canvas.Image at index 1")
 				return
 			}
-			cropped := util.CropImageFast(sliderSection.img2, val)
+			cropped := util.CropImageFast(sliderSection.img2, val, sliderSection.scalingAlgo)
 
 			sliderSection.imageContainer.Objects[1].(*canvas.Image).Image = cropped
 			fyne.Do(func() {

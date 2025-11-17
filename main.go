@@ -29,6 +29,8 @@ var image2Path string
 var image1 *image.Image
 var image2 *image.Image
 
+var scalingAlgo util.ScalingAlgorithm
+
 // Reference to the main window, used for displaying dialogs and other UI elements.
 var mainWindow fyne.Window
 
@@ -37,7 +39,7 @@ var loadingWaitGroup = &sync.WaitGroup{}
 
 func renderComparison() {
 	startTime := time.Now()
-	diff, mae, pixelCount := util.ComputeImageDiffFast(image1, image2)
+	diff, mae, pixelCount := util.ComputeImageDiffFast(image1, image2, scalingAlgo)
 	fmt.Printf("Image difference computed in %v\n", time.Since(startTime))
 
 	pixelWiseTab.SetImage(&diff)
@@ -45,7 +47,7 @@ func renderComparison() {
 	// Update the comparison section with the new images
 	layerSliderTab.RemoveAll()
 	if mae > 0 {
-		layerSliderTab.Compare(image1, image2)
+		layerSliderTab.Compare(image1, image2, scalingAlgo)
 	}
 
 	layerSliderTab.Refresh()
@@ -81,7 +83,7 @@ func loadAndRenderImage(path string, index int, wg bool) {
 
 	// Determine which image to update based on the index
 	const maxLength = 64
-	rescaledImg := util.RescaleImageFast(img)
+	rescaledImg := util.RescaleImageFast(img, scalingAlgo)
 	if index == 0 {
 		image1Path = path
 		image1 = &rescaledImg
@@ -112,10 +114,16 @@ func main() {
 	// Define flags for command-line arguments
 	image1Flag := flag.String("image1", "", "Path to the first image")
 	image2Flag := flag.String("image2", "", "Path to the second image")
-	showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
+	//showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
+	scalingAlgoFlag := flag.String("scaling-algo", "bilinear", "Image scaling algorithm (bilinear, nearest)")
 	flag.Parse()
 
-	fmt.Println("HI", showManagementButtonsFlag)
+	switch *scalingAlgoFlag {
+	case "nearest":
+		scalingAlgo = util.NearestNeighbor
+	default:
+		scalingAlgo = util.Bilinear
+	}
 
 	app := app.New()
 	mainWindow = app.NewWindow("Image comparison tool")
@@ -176,6 +184,7 @@ func main() {
 			}
 			mainWindow.Close()
 		},
+		scalingAlgo,
 	)
 
 	// Set up drag and drop functionality for the window.
@@ -209,8 +218,8 @@ func main() {
 	})
 
 	// Create tabs for Difference and Slider sections
-	pixelWiseTab = ui.NewPixelWiseTab()
-	layerSliderTab = ui.NewLayerSliderTab()
+	pixelWiseTab = ui.NewPixelWiseTab(scalingAlgo)
+	layerSliderTab = ui.NewLayerSliderTab(scalingAlgo)
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Difference", pixelWiseTab.GetContainer()),

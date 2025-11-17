@@ -42,6 +42,7 @@ func NewImageComparisonPanel(
 	onImageClicked func(imageNumber int),
 	onImageDeleted func(imageNumber int),
 	onImageIgnored func(),
+	algo util.ScalingAlgorithm,
 ) *ImageComparisonPanel {
 	panel := &ImageComparisonPanel{}
 
@@ -50,12 +51,12 @@ func NewImageComparisonPanel(
 
 	panel.image1Canvas = custom.NewClickableImage(nil, func() {
 		onImageClicked(1)
-	})
+	}, algo)
 	panel.image1Canvas.SetImageMinSize(fyne.NewSize(util.ImageMaxWidth, util.ImageMaxHeight))
 
 	panel.image2Canvas = custom.NewClickableImage(nil, func() {
 		onImageClicked(2)
-	})
+	}, algo)
 	panel.image2Canvas.SetImageMinSize(fyne.NewSize(util.ImageMaxWidth, util.ImageMaxHeight))
 
 	// Stack the canvas and the clickable button to make the canvas area interactive.
