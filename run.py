@@ -12,7 +12,14 @@ if os.path.exists("ignored_images.txt"):
         ignored_pairs = f.readlines()
         ignored_pairs = [pair.strip() for pair in ignored_pairs if pair.strip()]
         for pair in ignored_pairs:
-            p1, p2 = pair.split(":")
+            parts = pair.split(":")
+            p1 = parts[0]
+            p2 = parts[1]
+
+            # if at least one of the images does not exist, ignore the pair and delete the line
+            if not os.path.exists(p1) or not os.path.exists(p2):
+                continue
+
             ignored_pair_dict[pair] = True
             ignored_pair_dict["{}:{}".format(p2, p1)] = True
 
