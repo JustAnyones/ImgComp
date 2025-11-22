@@ -74,7 +74,11 @@ func absDiff(a, b uint32) uint32 {
 
 // computeImageDiff computes the pixel-wise difference between two images.
 // It returns a new image showing the differences and the mean absolute error (MAE).
-func ComputeImageDiffFast(img1, img2 *image.Image, algo ScalingAlgorithm) (image.Image, float64, uint64) {
+func ComputeImageDiffFast(
+	img1, img2 *image.Image,
+	algo ScalingAlgorithm,
+	differenceAsMonochrome bool,
+) (image.Image, float64, uint64) {
 	bounds := (*img1).Bounds()
 	// Computing difference requires both images to have the same bounds.
 	img22 := *img2
@@ -107,6 +111,19 @@ func ComputeImageDiffFast(img1, img2 *image.Image, algo ScalingAlgorithm) (image
 			ampR := math.Min(float64(dr)*amplificationFactor, 255)
 			ampG := math.Min(float64(dg)*amplificationFactor, 255)
 			ampB := math.Min(float64(db)*amplificationFactor, 255)
+
+			// If monochrome, show the same red color for all differences
+			if differenceAsMonochrome {
+				// If there is no difference, set pixel to black
+				if dr == 0 && dg == 0 && db == 0 {
+					ampR, ampG, ampB = 0, 0, 0
+				} else {
+					// Otherwise, set everything to red channel for visibility
+					ampG = 0
+					ampB = 0
+					ampR = 240
+				}
+			}
 
 			diff.Set(x, y, color.RGBA{
 				R: uint8(ampR),

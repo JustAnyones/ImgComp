@@ -14,11 +14,16 @@ type PixelWiseTab struct {
 	resultLabel *widget.Label
 	diffCanvas  *canvas.Image
 	container   *fyne.Container
+
+	showMonochrome     bool
+	onMonochromeChange func(bool)
 }
 
-func NewPixelWiseTab(algo util.ScalingAlgorithm) *PixelWiseTab {
+func NewPixelWiseTab(algo util.ScalingAlgorithm, onMonochromeChange func(bool)) *PixelWiseTab {
 	p := &PixelWiseTab{}
 	p.resultLabel = widget.NewLabel("???")
+	p.showMonochrome = false
+	p.onMonochromeChange = onMonochromeChange
 
 	p.diffCanvas = canvas.NewImageFromImage(nil)
 	if algo == util.NearestNeighbor {
@@ -29,8 +34,15 @@ func NewPixelWiseTab(algo util.ScalingAlgorithm) *PixelWiseTab {
 	p.diffCanvas.SetMinSize(fyne.NewSize(util.ImageMaxWidth, util.ImageMaxHeight))
 	p.diffCanvas.FillMode = canvas.ImageFillContain
 
+	button := widget.NewButton("Toggle Monochrome Diff", func() {
+		p.showMonochrome = !p.showMonochrome
+		if p.onMonochromeChange != nil {
+			p.onMonochromeChange(p.showMonochrome)
+		}
+	})
+
 	p.container = container.NewVBox(
-		p.resultLabel, p.diffCanvas,
+		p.resultLabel, p.diffCanvas, button,
 	)
 	return p
 }
@@ -38,6 +50,10 @@ func NewPixelWiseTab(algo util.ScalingAlgorithm) *PixelWiseTab {
 func (p *PixelWiseTab) SetImage(img *image.Image) {
 	p.diffCanvas.Image = *img
 	p.diffCanvas.Refresh()
+}
+
+func (p *PixelWiseTab) ShowMonochrome() bool {
+	return p.showMonochrome
 }
 
 func (p *PixelWiseTab) SetMessage(message string) {

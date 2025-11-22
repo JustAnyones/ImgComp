@@ -39,7 +39,7 @@ var loadingWaitGroup = &sync.WaitGroup{}
 
 func renderComparison() {
 	startTime := time.Now()
-	diff, mae, pixelCount := util.ComputeImageDiffFast(image1, image2, scalingAlgo)
+	diff, mae, pixelCount := util.ComputeImageDiffFast(image1, image2, scalingAlgo, pixelWiseTab.ShowMonochrome())
 	fmt.Printf("Image difference computed in %v\n", time.Since(startTime))
 
 	pixelWiseTab.SetImage(&diff)
@@ -219,7 +219,11 @@ func main() {
 	})
 
 	// Create tabs for Difference and Slider sections
-	pixelWiseTab = ui.NewPixelWiseTab(scalingAlgo)
+	pixelWiseTab = ui.NewPixelWiseTab(scalingAlgo, func(monochrome bool) {
+		if image1 != nil && image2 != nil {
+			renderComparison()
+		}
+	})
 	layerSliderTab = ui.NewLayerSliderTab(scalingAlgo)
 
 	tabs := container.NewAppTabs(
