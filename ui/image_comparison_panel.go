@@ -1,13 +1,13 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"imgcomp/ui/custom"
 	"imgcomp/util"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -15,9 +15,9 @@ type ImageComparisonPanel struct {
 	container *fyne.Container
 
 	image1Canvas *custom.ClickableImage
-	image1Label  *widget.Label
+	image1Label  *widget.RichText
 	image2Canvas *custom.ClickableImage
-	image2Label  *widget.Label
+	image2Label  *widget.RichText
 }
 
 func (p *ImageComparisonPanel) Image1Container() fyne.CanvasObject {
@@ -28,13 +28,29 @@ func (p *ImageComparisonPanel) Image2Container() fyne.CanvasObject {
 	return p.image2Canvas
 }
 
-func (p *ImageComparisonPanel) SetImage(imageNumber int, img *image.Image, text string) {
-	if imageNumber == 1 {
+func (p *ImageComparisonPanel) SetImage(imageNumber int, img *image.Image, path string, fileSize int64) {
+	formattedString := fmt.Sprintf(
+		"%s\n\n%dx%d | %s bytes",
+		path,
+		(*img).Bounds().Dx(),
+		(*img).Bounds().Dy(),
+		util.FormatIntWithSpaces(fileSize))
+
+	var chosenLabel *widget.RichText
+	switch imageNumber {
+	case 1:
 		p.image1Canvas.SetImage(*img)
-		p.image1Label.SetText(text)
-	} else if imageNumber == 2 {
+		chosenLabel = p.image1Label
+	case 2:
 		p.image2Canvas.SetImage(*img)
-		p.image2Label.SetText(text)
+		chosenLabel = p.image2Label
+	}
+	chosenLabel.ParseMarkdown(formattedString)
+	for i := range chosenLabel.Segments {
+		if seg, ok := chosenLabel.Segments[i].(*widget.TextSegment); ok {
+			seg.Style.Alignment = fyne.TextAlignCenter
+			chosenLabel.Wrapping = fyne.TextWrapBreak
+		}
 	}
 }
 
@@ -47,8 +63,10 @@ func NewImageComparisonPanel(
 ) *ImageComparisonPanel {
 	panel := &ImageComparisonPanel{}
 
-	panel.image1Label = widget.NewLabel("Image 1")
-	panel.image2Label = widget.NewLabel("Image 2")
+	panel.image1Label = widget.NewRichTextFromMarkdown("Image 1")
+	panel.image1Label.Wrapping = fyne.TextWrap(fyne.TextAlignCenter)
+	panel.image2Label = widget.NewRichTextFromMarkdown("Image 2")
+	panel.image2Label.Wrapping = fyne.TextWrap(fyne.TextAlignCenter)
 
 	panel.image1Canvas = custom.NewClickableImage(nil, func() {
 		onImageClicked(1)
@@ -70,8 +88,14 @@ func NewImageComparisonPanel(
 		panel.image2Canvas,
 	)
 
+	text1VBox := container.NewVBox(
+		panel.image1Label,
+	)
+	text2VBox := container.NewVBox(
+		panel.image2Label,
+	)
+
 	img1VBox := container.NewVBox(
-		container.New(layout.NewCenterLayout(), panel.image1Label),
 		img1Container,
 	)
 	if showManagementButtons {
@@ -81,7 +105,6 @@ func NewImageComparisonPanel(
 	}
 
 	img2VBox := container.NewVBox(
-		container.New(layout.NewCenterLayout(), panel.image2Label),
 		img2Container,
 	)
 	if showManagementButtons {
@@ -90,12 +113,17 @@ func NewImageComparisonPanel(
 		}))
 	}
 
+	textRow := container.NewGridWithColumns(2,
+		text1VBox,
+		text2VBox,
+	)
+
 	imageRow := container.NewGridWithColumns(2,
 		img1VBox,
 		img2VBox,
 	)
 
-	panel.container = container.NewVBox(imageRow)
+	panel.container = container.NewVBox(textRow, imageRow)
 
 	if showManagementButtons {
 		ignoreButton := widget.NewButton("Ignore", onImageIgnored)

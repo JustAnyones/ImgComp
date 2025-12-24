@@ -141,56 +141,6 @@ func ComputeImageDiffFast(
 	return diff, mae, pixelCount
 }
 
-// wrapStringIntelligently wraps a string into multiple lines,
-// splitting at '/' characters, so that each line does not exceed maxLength.
-// It prioritizes keeping segments together on a line if possible.
-func WrapStringIntelligently(s string, maxLength int) string {
-	// No need to wrap if it's already within the limit
-	if len(s) <= maxLength {
-		return s
-	}
-
-	parts := strings.Split(s, "/")
-	// If no slashes to split by, return original
-	if len(parts) <= 1 {
-		return s
-	}
-
-	var result strings.Builder
-	currentLineLength := 0
-	for i, part := range parts {
-		// If it's not the first part and we're starting a new segment,
-		// we need to account for the '/' character's length.
-		segmentLength := len(part)
-		if i > 0 {
-			segmentLength += 1
-		}
-
-		// Check if adding this part (and its preceding slash, if any)
-		// would exceed the maxLength for the current line.
-		// Also, ensure we don't start a line with just a slash if the previous part was the end of a line.
-		if currentLineLength > 0 && currentLineLength+segmentLength > maxLength {
-			result.WriteString("\n") // Start a new line
-			currentLineLength = 0
-		}
-
-		if i > 0 && currentLineLength > 0 { // Add '/' if it's not the first segment and not at the beginning of a new line
-			result.WriteString("/")
-			currentLineLength += 1
-		}
-
-		if i > 0 && currentLineLength == 0 {
-			result.WriteString("/")
-			currentLineLength += 1 // Start with a slash if it's the first segment on a new line
-		}
-
-		result.WriteString(part)
-		currentLineLength += len(part)
-	}
-
-	return result.String()
-}
-
 // loadImage attempts to load an image from the given path.
 // It includes special handling for .jxl files, converting them to PNG using 'djxl' utility.
 // TODO: handle webps and animated versions of those formats

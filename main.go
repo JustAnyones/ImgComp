@@ -82,19 +82,18 @@ func loadAndRenderImage(path string, index int, wg bool) {
 	}
 
 	// Determine which image to update based on the index
-	const maxLength = 64
 	rescaledImg := util.RescaleImageFast(img, scalingAlgo)
 	if index == 0 {
 		image1Path = path
 		image1 = &rescaledImg
 		fyne.Do(func() {
-			comparisonPanel.SetImage(1, &img, fmt.Sprintf("%s (%s bytes)", util.WrapStringIntelligently(path, maxLength), util.FormatIntWithSpaces(fileInfo.Size())))
+			comparisonPanel.SetImage(1, &img, path, fileInfo.Size())
 		})
 	} else {
 		image2Path = path
 		image2 = &rescaledImg
 		fyne.Do(func() {
-			comparisonPanel.SetImage(2, &img, fmt.Sprintf("%s (%s bytes)", util.WrapStringIntelligently(path, maxLength), util.FormatIntWithSpaces(fileInfo.Size())))
+			comparisonPanel.SetImage(2, &img, path, fileInfo.Size())
 		})
 
 	}
