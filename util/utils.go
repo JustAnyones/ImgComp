@@ -201,3 +201,10 @@ func GetScaledBounds(srcImage *image.Image) (float32, float32) {
 
 	return sizeX, sizeY
 }
+
+// MoveFileToTrash moves the specified file to the system trash/recycle bin.
+// It uses `trash` command underneath, which should be available on most systems.
+func MoveFileToTrash(path string) error {
+	cmd := exec.Command("trash", path)
+	return cmd.Run()
+}

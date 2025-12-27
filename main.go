@@ -115,7 +115,17 @@ func main() {
 	image2Flag := flag.String("image2", "", "Path to the second image")
 	showManagementButtonsFlag := flag.Bool("show-management-buttons", true, "Show image management buttons (delete, ignore)")
 	scalingAlgoFlag := flag.String("scaling-algo", "bilinear", "Image scaling algorithm (bilinear, nearest)")
+	useTrashFlag := flag.Bool("use-trash", false, "Use system trash for deletions")
 	flag.Parse()
+
+	if *useTrashFlag {
+		// Check if 'trash' command is available
+		_, err := exec.LookPath("trash")
+		if err != nil {
+			fmt.Println("Error: 'trash' command not found. Please install it or disable the use-trash option.")
+			return
+		}
+	}
 
 	switch *scalingAlgoFlag {
 	case "nearest":
@@ -155,7 +165,12 @@ func main() {
 			}
 
 			if path != "" {
-				err := os.Remove(path)
+				var err error
+				if *useTrashFlag {
+					err = util.MoveFileToTrash(path)
+				} else {
+					err = os.Remove(path)
+				}
 				if err != nil {
 					dialog.ShowError(err, mainWindow)
 					return
