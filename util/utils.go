@@ -148,7 +148,7 @@ func LoadImage(path string) (image.Image, error) {
 	ext := filepath.Ext(path)
 	if ext == ".jxl" {
 		// Convert JXL to PNG using djxl. This assumes 'djxl' is available in the system's PATH.
-		tmpFile := path + ".converted.png"
+		tmpFile := path + ".converted.jpg"
 		cmd := exec.Command("djxl", path, tmpFile)
 		err := cmd.Run()
 		if err != nil {
